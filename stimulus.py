@@ -58,9 +58,10 @@ class StimGenerator():
                           s_s_b*(torch.bitwise_not(types[:,1:]).expand(-1,len(f_s_b))))
         input_s[:,:t_start_sign] = 1
         input_s[:,t_stop_sign:] = 1
-        # create desired output (0 - DECISION), decision is 1 (same), 0 (different)
+        # create desired output (0 - DECISION), decision is 1 (same), -1 (different)
         output_s = torch.zeros_like(input_s)
         output_s[:,t_stop_sign:] = 1*decision[:,None].expand(-1, len(times) - t_stop_sign)
+        output_s[:,t_stop_sign:] -= 1*torch.bitwise_not(decision)[:,None].expand(-1, len(times) - t_stop_sign)
 
         return input_s + self.rest_val, output_s
 
@@ -116,6 +117,7 @@ if __name__ == '__main__':
     B = 10
     i,o = sg.get_batch_data(B)
     i,o = sg.extend_sim(30, i, o)
+    print(i.shape)
 
     for k in range(int(B//2)):
         ii,oo = sg.concat_sim(i[2*k:2*(k+1),:],o[2*k:2*(k+1),:])

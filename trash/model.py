@@ -49,18 +49,19 @@ class BI_cell(nn.Module):
         # print(self.params.shape)
         # exit()
         # gates; i.e. time constants
-        c = self.ensure_gate(c)
-        d = self.ensure_gate(c*.09)
-        b = b*0
-        d = 1 + d*0
-        e = e*0
+        c = 1 + c*0#self.ensure_gate(c)
+        # d = #self.ensure_gate(c*.09)
+        a = .5 + a*0
+        b = 2 + b*0
+        d = c*2.1#1e-5 + d*0#1 + d*0
+        e = 1 + e*0#e*0
         hp_0 = h[:,:self.n_mem]
         hp_1 = h[:,self.n_mem:]
         h0 = hp_0*(1 -c) + c*self.nl((a + 
                                         b*hp_0**2 - 
                                         hp_1)*hp_0 
-                                        + u_emb)
-        h1 = hp_1*(1 - d) + d*((e)*hp_0)**4
+                                        + u)
+        h1 = hp_1*(1 - d) + d*((e)*hp_0)
 
         return torch.cat((h0, h1), dim = 1)
     
@@ -92,7 +93,7 @@ class BI_RNN(nn.Module):
             mem_f.append(mem[0,0].detach())
             mem_s.append(mem[0,1].detach())
 
-        # plt.plot(u[0,:]*.05)
+        # plt.plot(u[0,:])
         # plt.plot(mem_f)
         # plt.plot(mem_s)
         # plt.show()
@@ -103,26 +104,25 @@ class BI_RNN(nn.Module):
     def loss(self, u, target):
         loss = 0
         out = self(u)
-        enforce_eval = 1
+        enforce_eval = 10000
         # eps = 1e-5
         # z_val = (target == 0).sum(dim = 1)
         # o_val = (target == 1).sum(dim = 1)
         # w = o_val/(z_val + eps)
-        loss = self.loss_f(out, target)
-        # for i in range(out.shape[1]):
+        # loss = self.loss_f(out, target)
+        for i in range(out.shape[1]):
 
-        #     with torch.autograd.set_detect_anomaly(True):
-        #         if i%enforce_eval == 0:
-        #             loss += self.loss_f(out[:,i], target[:,i])
-        #             # print(loss)
+            with torch.autograd.set_detect_anomaly(True):
+                if i%enforce_eval == 0:
+                    loss += self.loss_f(out[:,i], target[:,i])
+                    # print(loss)
             
-        #         mask = out[:,i] == 1
-        #         if mask.sum() != 0:
-        #             loss += self.loss_f(out[:,i][mask], target[:,i][mask])
-        #             # print(loss)
+                mask = out[:,i] == 1
+                if mask.sum() != 0:
+                    loss += self.loss_f(out[:,i][mask], target[:,i][mask])
+                    # print(loss)
         
         return loss
-
 
 
 if __name__ == '__main__':
