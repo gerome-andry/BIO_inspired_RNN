@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt   
 import os
+import torch.nn as nn 
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
@@ -67,15 +68,16 @@ class StimGenerator():
 
     def f_stim(self):
         t = torch.linspace(0, self.dt_stim, int(self.dt_stim//self.dt))
-        stim = (2*torch.pi*self.f*t).sin()
+        stim = (3*torch.pi*self.f*t).sin()
 
-        return stim
+        return nn.functional.relu(stim)
     
     def s_stim(self):
         t = torch.linspace(0, self.dt_stim, int(self.dt_stim//self.dt))
         stim = (torch.pi*self.f*t).sin()
 
-        return stim
+        return nn.functional.relu(stim)
+
     
     def extend_sim(self, time_int, i, o):
         lg = int(time_int//self.dt)

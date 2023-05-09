@@ -4,24 +4,24 @@ import torch.nn as nn
 def encode_choice(probs):
     # probs of size (B, L, 3)
     choice = torch.argmax(probs, dim = -1)
-    # choice[choice == 2] = -1 # -> (B,L)
+    choice[choice == 2] = -1 # -> (B,L)
     
     return choice
 
 def decode_choice(choice):
-    probs = torch.zeros(choice.shape + (2,))
+    probs = torch.zeros(choice.shape + (3,))
     
-    m0 = (choice == 0)[...,None].repeat(1,1,2)
-    m0[...,[1]] = False
+    m0 = (choice == 0)[...,None].repeat(1,1,3)
+    m0[...,[1,2]] = False
     probs[m0] = 1
 
-    m1 = (choice == 1)[...,None].repeat(1,1,2)
-    m1[...,[0]] = False
+    m1 = (choice == 1)[...,None].repeat(1,1,3)
+    m1[...,[0,2]] = False
     probs[m1] = 1
 
-    # m2 = (choice == -1)[...,None].repeat(1,1,3)
-    # m2[...,[0,1]] = False
-    # probs[m2] = 1
+    m2 = (choice == -1)[...,None].repeat(1,1,3)
+    m2[...,[0,1]] = False
+    probs[m2] = 1
 
     return probs
 
@@ -93,7 +93,7 @@ class SenseMemAct(nn.Module):
         pred = self(x)
         
         not_m = torch.bitwise_not(mask)
-        return  self.l(pred, target)#2*self.l(pred[mask], target[mask])# + .5*self.l(pred[not_m], target[not_m])
+        return  self.l(pred[mask], target[mask])# + .5*self.l(pred[not_m], target[not_m])
 
 # probs = torch.rand((1,10,3))
 # print(probs)

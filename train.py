@@ -10,10 +10,10 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 epoch = 64
 batch = 64
 batch_sz = 128
-memory_size = 32
+memory_size = 64
 in_emb = memory_size//2
-mem_lay = 5
-decisions = 2
+mem_lay = 2
+decisions = 3
 
 sensor = ResMLP(1, in_emb, [64,64,64])
 actor = ResMLP(memory_size, decisions, [64,64,64])
@@ -57,7 +57,7 @@ for ep in trange(epoch):
             # out *= 0
             pred = model(inp.unsqueeze(-1))
 
-            for i in range(2):
+            for i in range(3):
                 plt.plot(pred[0,:,i], label = f'p({choice_d[i]})')
 
             pred = encode_choice(pred)
