@@ -40,14 +40,84 @@ class ResMLP(nn.Module):
 
         return self.tail(x)
     
+class nBRC(nn.Module): #extend to multiple layers ?
+    def __init__(self, in_sz, mem_sz, mem_lay = 1, bias = False, batch_first = True):
+        super().__init__()
+        self.ff_ia = nn.Linear(in_sz, mem_sz, bias = bias)
+        self.ff_ha = nn.Linear(mem_sz, mem_sz, bias = bias)
+
+        self.ff_ic = nn.Linear(in_sz, mem_sz, bias = bias)
+        self.ff_hc = nn.Linear(mem_sz, mem_sz, bias = bias)
+
+        self.ff_io = nn.Linear(in_sz, mem_sz, bias = bias)
+        self.mem_sz = mem_sz
+
+    def step(self, x, h, bist = False): #x of the form (B,N), h -> (B,M)
+        a = 1 + torch.tanh(self.ff_ia(x) + self.ff_ha(h))
+        if bist:
+            print("Proportion of bistable neurons",(a.mean(0) > 1).sum()/(a.mean(0).numel()))
+        c = torch.sigmoid(self.ff_ic(x) + self.ff_hc(h))
+
+        return c*h + (1-c)*torch.tanh(self.ff_io(x) + a*h)
+    
+    def forward(self, u, h0 = None): #u -> (B,L,N), h0 initial mem (B,M)
+        B, L, _ = u.shape
+        if h0 is None:
+            h0 = torch.zeros((B, self.mem_sz))
+
+        h_t = [h0]
+        for i in range(L):
+            h_next = self.step(u[:,i], h_t[-1], bist = i % 30 == 0)
+            h_t.append(h_next)
+        
+        h_t = [h.unsqueeze(1) for h in h_t[1:]]
+        
+        return torch.cat(h_t, dim = 1), h_t[-1] # (B,L,M)
+
+class nBEFRC(nn.Module): #extend to multiple layers ?
+    def __init__(self, in_sz, mem_sz, mem_lay = 1, bias = False, batch_first = True):
+        super().__init__()
+        self.ff_ia = nn.Linear(in_sz, mem_sz, bias = bias)
+        self.ff_ha = nn.Linear(mem_sz, mem_sz, bias = bias)
+
+        self.ff_ic = nn.Linear(in_sz, mem_sz, bias = bias)
+        self.ff_hc = nn.Linear(mem_sz, mem_sz, bias = bias)
+
+        self.ff_io = nn.Linear(in_sz, mem_sz, bias = bias)
+        self.mem_sz = mem_sz
+
+    def step(self, x, h, bist = False): #x of the form (B,N), h -> (B,M)
+        a = 1 + torch.tanh(self.ff_ia(x) + self.ff_ha(h))
+        if bist:
+            pass
+            print("Proportion of bistable neurons",(a.mean(0) > 1).sum()/(a.mean(0).numel()))
+        c = torch.sigmoid(self.ff_ic(x) + self.ff_hc(h))
+
+        return c*h + (1-c)*torch.tanh(self.ff_io(x) + a*h)
+    
+    def forward(self, u, h0 = None): #u -> (B,L,N), h0 initial mem (B,M)
+        B, L, _ = u.shape
+        if h0 is None:
+            h0 = torch.zeros((B, self.mem_sz))
+
+        h_t = [h0]
+        for i in range(L):
+            h_next = self.step(u[:,i], h_t[-1], bist = i % 30 == 0)
+            h_t.append(h_next)
+        
+        h_t = [h.unsqueeze(1) for h in h_t[1:]]
+        
+        return torch.cat(h_t, dim = 1), h_t[-1] # (B,L,M)
 
 class SenseMemAct(nn.Module):
-    def __init__(self, sensor_net, actor_net, mem_lay = 1, in_sz = 1, mem_sz = 64, decisions = 3, bias = False):
+    def __init__(self, sensor_net, actor_net, mem_lay = 1, in_sz = 1, mem_sz = 64, decisions = 3, bias = False, ortho = False):
         super().__init__()
         self.sense = sensor_net
         self.act = actor_net
         self.dec = decisions
-        self.mem = [nn.GRU(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)]
+        self.memsz = mem_sz
+        self.orth = ortho
+        self.mem = nBRC(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
         # self.mem = nn.ModuleList([nn.GRU(in_sz, mem_sz, 1, bias = bias, batch_first = True) for _ in range(mem_lay)])
         self.decision = nn.Softmax(dim = -1)
         self.l = nn.CrossEntropyLoss()
@@ -55,48 +125,31 @@ class SenseMemAct(nn.Module):
     def forward(self, x): 
         # X of the size (Batch, Sequence_lg, Input_sz)
         # Denoted B,L,N
+        with torch.no_grad():
+            # orthogonal matrix hidden-hidden
+            if self.orth:
+                u,_,v = torch.linalg.svd(self.mem[0].weight_hh_l0[:self.memsz,:])
+                self.mem[0].weight_hh_l0[:self.memsz,:] = u@v
+
         B, L, N = x.shape        
         # transfer sequence to sensor -> go back to sequence
         inputs = self.sense(x.reshape((-1, N))).reshape((B,L,-1))
-        B, L, N = inputs.shape
         # transfer to memory
-        if len(self.mem) > 1:
-            memory = []
-            mems = []
-            for l in range(L):
-                for i,m in enumerate(self.mem):
-                    if l ==0 and i == 0:
-                        hi,_ = m(inputs[:,l,:].unsqueeze(1))
-                    else:
-                        hi,_ = m(inputs[:,l,:].unsqueeze(1), mems[-1])
-                        if i == 0:
-                            mems = []
-
-                    mems.append(hi.transpose(0,1))
-                memory.append(torch.cat([m.transpose(0,1) for m in mems], dim = 2))
-
-            memory = torch.cat(memory, dim = 1) #retrieve the sequence of hidden states
-        else:
-            memory,_ = self.mem[0](inputs)
+        memory,_ = self.mem(inputs)
 
         B, L, M = memory.shape
         # transfer sequence output to actions sequence 
         
-        in_act = memory.reshape((-1,3, M//3))
-        out = []
-        for k in range(3):
-            out.append(self.act(in_act[...,k,:]).reshape((B,L,self.dec//3)))
+        out = self.decision(self.act(memory.reshape((-1, M))).reshape((B,L,self.dec)))
+        # out = self.decision(memory[:,:,:3])
 
-        out = torch.cat(out, dim = -1)
-        out = self.decision(out)
-
-        return out, memory.reshape((-1, L, 3, M//3)).mean(dim = -1)
+        return out
 
     def loss(self, x, target):
         # X - (B,L,N) | T - (B,L,O), O = 3 (choices)
 
         mask = (target[:,:,0] != 1)
-        pred,_ = self(x)
+        pred = self(x)
         
         not_m = torch.bitwise_not(mask)
         # return  self.l(pred[mask], target[mask]) + .5*self.l(pred[not_m], target[not_m])

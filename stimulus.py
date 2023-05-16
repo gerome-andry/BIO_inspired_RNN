@@ -45,7 +45,7 @@ class StimGenerator():
         decision = types[:,0] == types[:,1]
         
         # create input (START - S1 - S2 - STOP)
-        input_s = torch.zeros((nb, len(times))) + .1
+        input_s = torch.zeros((nb, len(times)))
         idx_stim = torch.arange(int(self.dt_stim//self.dt))[None,:].expand(nb, -1)
         s1_t = t1[:,None] + idx_stim
         s2_t = t2[:,None] + idx_stim  
@@ -57,8 +57,8 @@ class StimGenerator():
                           s_s_b*(torch.bitwise_not(types[:,:1]).expand(-1,len(f_s_b))))
         input_s.scatter_(1, s2_t, f_s_b*(types[:,1:].expand(-1,len(f_s_b))) +
                           s_s_b*(torch.bitwise_not(types[:,1:]).expand(-1,len(f_s_b))))
-        for i, (t1,t2) in enumerate(zip(s1_t[:,-1], s2_t[:,0])):
-            input_s[i, t1:t2] = .5
+        # for i, (t1,t2) in enumerate(zip(s1_t[:,-1], s2_t[:,0])):
+        #     input_s[i, t1:t2] = .5
 
         input_s[:,:t_start_sign] = 1
         input_s[:,t_stop_sign:] = 1

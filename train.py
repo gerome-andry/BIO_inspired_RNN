@@ -10,13 +10,14 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 epoch = 64
 batch = 64
 batch_sz = 128
-memory_size = 96
-in_emb = memory_size//2
+memory_size = 128
+in_emb = memory_size//4
 mem_lay = 1
+inputs_dim = 2
 decisions = 3
 
-sensor = ResMLP(1, in_emb, [64,64,64])
-actor = ResMLP(memory_size//3, decisions//3, [64,64,64])
+sensor = ResMLP(inputs_dim, in_emb, [64,64,64])
+actor = ResMLP(memory_size, decisions, [64,64,64])
 
 model = SenseMemAct(sensor, actor, in_sz=in_emb, mem_sz=memory_size, mem_lay=mem_lay, decisions=decisions)
 
@@ -43,35 +44,46 @@ for ep in trange(epoch):
         # out[...] = 1
 
         optimizer.zero_grad()
-        l = model.loss(inp.unsqueeze(-1), decode_choice(out))
+        B,L = inp.shape
+        mod_in = torch.zeros((B,L,2))
+        mod_in[...,0][inp == 1] = 1
+        mod_in[...,1][inp != 1] = inp[inp!=1]
+
+        l = model.loss(mod_in, decode_choice(out))
         with torch.autograd.set_detect_anomaly(True):
             l.backward()
             optimizer.step()
         print(l)
         loss.append(l.detach())
-        with torch.no_grad():
-            inp, out = sg.get_batch_data(2)
-            inp, out = sg.extend_sim(30, inp, out)
-            # inp += torch.randn_like(inp)*.01
-            # out += torch.randn_like(out)*.01
-            # out *= 0
-            outp, pred = model(inp.unsqueeze(-1))
+        # with torch.no_grad():
+        #     inp, out = sg.get_batch_data(2)
+        #     inp, out = sg.extend_sim(30, inp, out)
+        #     # inp += torch.randn_like(inp)*.01
+        #     # out += torch.randn_like(out)*.01
+        #     # out *= 0
+        #     B,L = inp.shape
+        #     mod_in = torch.zeros((B,L,2))
+        #     mod_in[...,0][inp == 1] = 1
+        #     mod_in[...,1][inp != 1] = inp[inp!=1]
 
-            for i in range(3):
-                plt.plot(pred[0,:,i], label = f'p({choice_d[i]})')
+        #     pred = model(mod_in)
 
-            pred = encode_choice(outp)
-            plt.plot(inp[0,:])
-            plt.title('pred')
-            plt.plot(out[0,:])
-            plt.plot(pred[0,:])
-            plt.show(block = False)
-            plt.pause(.01)
-            plt.clf()
+        #     for i in range(3):
+        #         plt.plot(pred[0,:,i], label = f'p({choice_d[i]})')
+
+        #     pred = encode_choice(pred)
+        #     plt.plot(inp[0,:])
+        #     plt.title('pred')
+        #     plt.plot(out[0,:])
+        #     plt.plot(pred[0,:])
+        #     plt.show(block = False)
+        #     plt.pause(.01)
+        #     plt.clf()
 
 plt.plot(loss)
 plt.show()
 
+torch.save(model.state_dict(), './checkpoint.pth')
 with torch.no_grad():
     inp, out = sg.get_batch_data(2)
     inp, out = sg.extend_sim(30, inp, out)
