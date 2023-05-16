@@ -64,7 +64,7 @@ class nBRC(nn.Module): #extend to multiple layers ?
     def forward(self, u, h0 = None): #u -> (B,L,N), h0 initial mem (B,M)
         B, L, _ = u.shape
         if h0 is None:
-            h0 = torch.zeros((B, self.mem_sz))
+            h0 = torch.zeros((B, self.mem_sz)).to(u)
 
         h_t = [h0]
         for i in range(L):
@@ -122,7 +122,8 @@ class SenseMemAct(nn.Module):
         self.decision = nn.Softmax(dim = -1)
         self.l = nn.CrossEntropyLoss()
 
-    def forward(self, x): 
+    def forward(self, x, debug_mem = False): 
+        # print(x, debug_mem)
         # X of the size (Batch, Sequence_lg, Input_sz)
         # Denoted B,L,N
         with torch.no_grad():
@@ -140,7 +141,10 @@ class SenseMemAct(nn.Module):
         B, L, M = memory.shape
         # transfer sequence output to actions sequence 
         
-        out = self.decision(self.act(memory.reshape((-1, M))).reshape((B,L,self.dec)))
+        if debug_mem:
+            out = memory 
+        else:
+            out = self.decision(self.act(memory.reshape((-1, M))).reshape((B,L,self.dec)))
         # out = self.decision(memory[:,:,:3])
 
         return out
@@ -148,12 +152,15 @@ class SenseMemAct(nn.Module):
     def loss(self, x, target):
         # X - (B,L,N) | T - (B,L,O), O = 3 (choices)
 
-        mask = (target[:,:,0] != 1)
         pred = self(x)
         
+        mask = (target[:,:,0] != 1)
         not_m = torch.bitwise_not(mask)
-        # return  self.l(pred[mask], target[mask]) + .5*self.l(pred[not_m], target[not_m])
-        return self.l(pred, target)
+        pred_dec, targ_dec = pred[mask], target[mask]
+        pred_ndec, targ_ndec = pred[not_m], target[not_m]
+
+        return  (10/30)*self.l(pred_dec, targ_dec) + (20/30)*self.l(pred_ndec, targ_ndec)
+        # return self.l(pred, target.transpose(-2,-1))
 # probs = torch.rand((1,10,3))
 # print(probs)
 # ch = encode_choice(probs)
