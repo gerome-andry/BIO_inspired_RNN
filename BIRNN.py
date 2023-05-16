@@ -58,6 +58,7 @@ class SenseMemAct(nn.Module):
         B, L, N = x.shape        
         # transfer sequence to sensor -> go back to sequence
         inputs = self.sense(x.reshape((-1, N))).reshape((B,L,-1))
+        B, L, N = inputs.shape
         # transfer to memory
         if len(self.mem) > 1:
             memory = []
@@ -81,10 +82,15 @@ class SenseMemAct(nn.Module):
         B, L, M = memory.shape
         # transfer sequence output to actions sequence 
         
-        out = self.decision(self.act(memory.reshape((-1, M))).reshape((B,L,self.dec)))
-        # out = self.decision(memory[:,:,:3])
+        in_act = memory.reshape((-1,3, M//3))
+        out = []
+        for k in range(3):
+            out.append(self.act(in_act[...,k,:]).reshape((B,L,self.dec//3)))
 
-        return out
+        out = torch.cat(out, dim = -1)
+        out = self.decision(out)
+
+        return out, memory.reshap((-1, L, 3, M//3)).mean(dim = -1)
 
     def loss(self, x, target):
         # X - (B,L,N) | T - (B,L,O), O = 3 (choices)
@@ -93,8 +99,8 @@ class SenseMemAct(nn.Module):
         pred = self(x)
         
         not_m = torch.bitwise_not(mask)
-        return  self.l(pred[mask], target[mask])# + .5*self.l(pred[not_m], target[not_m])
-
+        # return  self.l(pred[mask], target[mask]) + .5*self.l(pred[not_m], target[not_m])
+        return self.l(pred, target)
 # probs = torch.rand((1,10,3))
 # print(probs)
 # ch = encode_choice(probs)

@@ -45,7 +45,7 @@ class StimGenerator():
         decision = types[:,0] == types[:,1]
         
         # create input (START - S1 - S2 - STOP)
-        input_s = torch.zeros((nb, len(times)))
+        input_s = torch.zeros((nb, len(times))) + .1
         idx_stim = torch.arange(int(self.dt_stim//self.dt))[None,:].expand(nb, -1)
         s1_t = t1[:,None] + idx_stim
         s2_t = t2[:,None] + idx_stim  
@@ -57,6 +57,9 @@ class StimGenerator():
                           s_s_b*(torch.bitwise_not(types[:,:1]).expand(-1,len(f_s_b))))
         input_s.scatter_(1, s2_t, f_s_b*(types[:,1:].expand(-1,len(f_s_b))) +
                           s_s_b*(torch.bitwise_not(types[:,1:]).expand(-1,len(f_s_b))))
+        for i, (t1,t2) in enumerate(zip(s1_t[:,-1], s2_t[:,0])):
+            input_s[i, t1:t2] = .5
+
         input_s[:,:t_start_sign] = 1
         input_s[:,t_stop_sign:] = 1
         # create desired output (0 - DECISION), decision is 1 (same), -1 (different)
@@ -68,13 +71,14 @@ class StimGenerator():
 
     def f_stim(self):
         t = torch.linspace(0, self.dt_stim, int(self.dt_stim//self.dt))
-        stim = (3*torch.pi*self.f*t).sin()
-
+        # stim = (3*torch.pi*self.f*t).sin()
+        stim = t*0 + .3
         return nn.functional.relu(stim)
     
     def s_stim(self):
         t = torch.linspace(0, self.dt_stim, int(self.dt_stim//self.dt))
         stim = (torch.pi*self.f*t).sin()
+        stim = t*0 + .7
 
         return nn.functional.relu(stim)
 
@@ -119,7 +123,7 @@ if __name__ == '__main__':
     B = 10
     i,o = sg.get_batch_data(B)
     i,o = sg.extend_sim(30, i, o)
-    print(i.shape)
+    # print(i.shape)
 
     for k in range(int(B//2)):
         ii,oo = sg.concat_sim(i[2*k:2*(k+1),:],o[2*k:2*(k+1),:])

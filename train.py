@@ -10,13 +10,13 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 epoch = 64
 batch = 64
 batch_sz = 128
-memory_size = 64
+memory_size = 96
 in_emb = memory_size//2
-mem_lay = 2
+mem_lay = 1
 decisions = 3
 
 sensor = ResMLP(1, in_emb, [64,64,64])
-actor = ResMLP(memory_size, decisions, [64,64,64])
+actor = ResMLP(memory_size//3, decisions//3, [64,64,64])
 
 model = SenseMemAct(sensor, actor, in_sz=in_emb, mem_sz=memory_size, mem_lay=mem_lay, decisions=decisions)
 
