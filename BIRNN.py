@@ -90,13 +90,13 @@ class SenseMemAct(nn.Module):
         out = torch.cat(out, dim = -1)
         out = self.decision(out)
 
-        return out, memory.reshap((-1, L, 3, M//3)).mean(dim = -1)
+        return out, memory.reshape((-1, L, 3, M//3)).mean(dim = -1)
 
     def loss(self, x, target):
         # X - (B,L,N) | T - (B,L,O), O = 3 (choices)
 
         mask = (target[:,:,0] != 1)
-        pred = self(x)
+        pred,_ = self(x)
         
         not_m = torch.bitwise_not(mask)
         # return  self.l(pred[mask], target[mask]) + .5*self.l(pred[not_m], target[not_m])

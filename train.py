@@ -55,12 +55,12 @@ for ep in trange(epoch):
             # inp += torch.randn_like(inp)*.01
             # out += torch.randn_like(out)*.01
             # out *= 0
-            pred = model(inp.unsqueeze(-1))
+            outp, pred = model(inp.unsqueeze(-1))
 
             for i in range(3):
                 plt.plot(pred[0,:,i], label = f'p({choice_d[i]})')
 
-            pred = encode_choice(pred)
+            pred = encode_choice(outp)
             plt.plot(inp[0,:])
             plt.title('pred')
             plt.plot(out[0,:])
