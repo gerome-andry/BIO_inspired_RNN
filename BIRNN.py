@@ -54,9 +54,9 @@ class nBRC(nn.Module): #extend to multiple layers ?
 
     def step(self, x, h, bist = False): #x of the form (B,N), h -> (B,M)
         a = 1 + torch.tanh(self.ff_ia(x) + self.ff_ha(h))
-        if bist:
-            pass
-            print("Proportion of bistable neurons",(a.mean(0) > 1).sum()/(a.mean(0).numel()))
+        # if bist:
+        #     pass
+        #     print("Proportion of bistable neurons",(a.mean(0) > 1).sum()/(a.mean(0).numel()))
         c = torch.sigmoid(self.ff_ic(x) + self.ff_hc(h))
 
         return c*h + (1-c)*torch.tanh(self.ff_io(x) + a*h)
