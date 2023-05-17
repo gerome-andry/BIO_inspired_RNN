@@ -9,8 +9,8 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 epoch = 64
 batch = 64
-batch_sz = 256
-memory_size = 256
+batch_sz = 128
+memory_size = 128
 in_emb = memory_size//4
 mem_lay = 1
 inputs_dim = 2
@@ -55,32 +55,32 @@ for ep in trange(epoch):
             optimizer.step()
         print(l)
         loss.append((l.detach()).cpu())
-        # with torch.no_grad():
-        #     inp, out = sg.get_batch_data(2)
-        #     inp, out = sg.extend_sim(30, inp, out)
-        #     # inp += torch.randn_like(inp)*.01
-        #     # out += torch.randn_like(out)*.01
-        #     # out *= 0
-        #     B,L = inp.shape
-        #     mod_in = torch.zeros((B,L,2))
-        #     mod_in[...,0][inp == 1] = 1
-        #     mod_in[...,1][inp != 1] = inp[inp!=1]
+        with torch.no_grad():
+            inp, out = sg.get_batch_data(2)
+            inp, out = sg.extend_sim(30, inp, out)
+            # inp += torch.randn_like(inp)*.01
+            # out += torch.randn_like(out)*.01
+            # out *= 0
+            B,L = inp.shape
+            mod_in = torch.zeros((B,L,2))
+            mod_in[...,0][inp == 1] = 1
+            mod_in[...,1][inp != 1] = inp[inp!=1]
 
-        #     pred = model(mod_in.cuda()).cpu()
+            pred = model(mod_in.cuda()).cpu()
 
-        #     for i in range(3):
-        #         plt.plot(pred[0,:,i], label = f'p({choice_d[i]})')
+            for i in range(3):
+                plt.plot(pred[0,:,i], label = f'p({choice_d[i]})')
 
-        #     pred = encode_choice(pred)
-        #     plt.plot(inp[0,:])
-        #     plt.title('pred')
-        #     plt.plot(out[0,:])
-        #     plt.plot(pred[0,:])
-        #     plt.show(block = False)
-        #     plt.pause(.01)
-        #     plt.clf()
+            pred = encode_choice(pred)
+            plt.plot(inp[0,:])
+            plt.title('pred')
+            plt.plot(out[0,:])
+            plt.plot(pred[0,:])
+            plt.show(block = False)
+            plt.pause(.01)
+            plt.clf()
 
 plt.plot(loss)
 plt.show()
 
-torch.save(model.state_dict(), './checkpoint_ext.pth')
+torch.save(model.state_dict(), './checkpoint_BEF.pth')
