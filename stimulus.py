@@ -28,7 +28,9 @@ class StimGenerator():
         # first signal must be after 'START_dt' + cooldown
         first_stim_ok = self.dt_inout + self.cooldown
         first_stim_stop = .5*(self.max_t - self.cooldown) - self.dt_stim
-        t1_mask = torch.bitwise_and(times > first_stim_ok, times < first_stim_stop)
+        scnd_stim_stop = self.max_t - self.cooldown - self.dt_stim - self.dt_inout
+        # t1_mask = torch.bitwise_and(times > first_stim_ok, times < first_stim_stop)
+        t1_mask = torch.bitwise_and(times > first_stim_ok, times < scnd_stim_stop)
         t1 = torch.tensor(np.random.choice(t_idx[t1_mask], size = nb, replace = True))
 
         # get time of second signal
@@ -42,7 +44,8 @@ class StimGenerator():
         # determine if signal will be of type fast or slow -> True = fast, False = slow
         types = torch.randint(2, (nb, 2), dtype = torch.bool)
         # compute the expected decision -> True = same, False = different
-        decision = types[:,0] == types[:,1]
+        # decision = types[:,0] == types[:,1]
+        decision = types[:,0] == 0
         
         # create input (START - S1 - S2 - STOP)
         input_s = torch.zeros((nb, len(times)))
@@ -55,11 +58,9 @@ class StimGenerator():
         s_s_b = self.s_stim()
         input_s.scatter_(1, s1_t, f_s_b*(types[:,:1].expand(-1,len(f_s_b))) +
                           s_s_b*(torch.bitwise_not(types[:,:1]).expand(-1,len(f_s_b))))
-        input_s.scatter_(1, s2_t, f_s_b*(types[:,1:].expand(-1,len(f_s_b))) +
-                          s_s_b*(torch.bitwise_not(types[:,1:]).expand(-1,len(f_s_b))))
-        # for i, (t1,t2) in enumerate(zip(s1_t[:,-1], s2_t[:,0])):
-        #     input_s[i, t1:t2] = .5
-
+        # input_s.scatter_(1, s2_t, f_s_b*(types[:,1:].expand(-1,len(f_s_b))) +
+        #                   s_s_b*(torch.bitwise_not(types[:,1:]).expand(-1,len(f_s_b))))
+        
         input_s[:,:t_start_sign] = 1
         input_s[:,t_stop_sign:] = 1
         # create desired output (0 - DECISION), decision is 1 (same), -1 (different)

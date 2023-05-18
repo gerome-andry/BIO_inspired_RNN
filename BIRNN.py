@@ -104,22 +104,51 @@ class nBEFRC(nn.Module): #extend to multiple layers ?
         d = .3*self.dt*torch.sigmoid(self.ff_id(x) + self.ff_hd(hf)) #slow epsilon in [0, .3] (one order below the fast)
         e = 1 + torch.sigmoid(self.ff_ie(x) + self.ff_he(hf)) #e in [1,2]
 
-        return (1-c)*hf + c*torch.tanh(self.ff_io(x) + (a + b*hf**2 - hs)*hf),\
-                hs*(1-d) + d*(e*hf)**4
+        hfn = (1-c)*hf + c*torch.tanh(self.ff_io(x) + (a + b*hf**2 - hs)*hf)
+        hsn = hs*(1-d) + d*(e*hf)**4
+        if bist:
+            return a,b,c,d,e, hfn, hsn
+        
+        return hfn, hsn
+                
     
-    def forward(self, u, h0 = None): #u -> (B,L,N), h0 initial mem (B,M)
+    def forward(self, u, h0 = None, mem = False): #u -> (B,L,N), h0 initial mem (B,M)
         B, L, _ = u.shape
         if h0 is None:
             h0 = torch.zeros((2, B, self.mem_sz)).to(u)
 
         hf_t = [h0[0]]
         hs_t = [h0[1]]
+        if mem:
+            al,bl,cl,dl,el = [],[],[],[],[]
         for i in range(L):
-            hf_next, hs_next = self.step(u[:,i], hf_t[-1], hs_t[-1])
+            if mem:
+                a,b,c,d,e,hf_next, hs_next = self.step(u[:,i], hf_t[-1], hs_t[-1], bist = True)
+                al.append(a)
+                bl.append(b)
+                cl.append(c)
+                dl.append(d)
+                el.append(e)
+            else:
+                hf_next, hs_next = self.step(u[:,i], hf_t[-1], hs_t[-1])
             hf_t.append(hf_next)
             hs_t.append(hs_next)
         
         h_t = [h.unsqueeze(1) for h in hf_t[1:]]
+        
+        if mem:
+            a_t = [at.unsqueeze(1) for at in al]
+            b_t = [bt.unsqueeze(1) for bt in bl]
+            c_t = [ct.unsqueeze(1) for ct in cl]
+            d_t = [dt.unsqueeze(1) for dt in dl]
+            e_t = [et.unsqueeze(1) for et in el]
+            
+            return torch.cat(a_t, dim = 1),\
+                   torch.cat(b_t, dim = 1),\
+                   torch.cat(c_t, dim = 1),\
+                   torch.cat(d_t, dim = 1),\
+                   torch.cat(e_t, dim = 1),\
+                   torch.cat(h_t, dim = 1) 
         
         return torch.cat(h_t, dim = 1), h_t[-1] # (B,L,M)
 
@@ -150,16 +179,14 @@ class SenseMemAct(nn.Module):
         # transfer sequence to sensor -> go back to sequence
         inputs = self.sense(x.reshape((-1, N))).reshape((B,L,-1))
         # transfer to memory
-        memory,_ = self.mem(inputs)
-
-        B, L, M = memory.shape
-        # transfer sequence output to actions sequence 
-        
-        if debug_mem:
-            out = memory 
-        else:
+        if not debug_mem:
+            memory,_ = self.mem(inputs)
+            B, L, M = memory.shape
+            # transfer sequence output to actions sequence 
             out = self.decision(self.act(memory.reshape((-1, M))).reshape((B,L,self.dec)))
-        # out = self.decision(memory[:,:,:3])
+        
+        else:
+            out = self.mem(inputs, mem = True)
 
         return out
 

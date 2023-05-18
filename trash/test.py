@@ -12,7 +12,7 @@ class brc():
     def next(self, h_t, u_t):
         h_next = torch.zeros_like(h_t)
         h_next[0] = (1-self.c)*h_t[0] + (self.c)*(u_t + (self.a - h_t[1])*h_t[0] + self.k*h_t[0]**3).tanh()
-        h_next[1] = self.s*((1.3*h_t[0])**4 - h_t[1]) + h_t[1]
+        h_next[1] = self.s*((1.4*h_t[0])**4 - h_t[1]) + h_t[1]
 
         return h_next
     
@@ -24,13 +24,13 @@ if __name__ == '__main__':
     tau = .001
     eps = .1
     dt = .1#.001
-    A = .7
-    B = 3
-    C = .9
-    D = .03
+    A = 1.7
+    B = 2.5
+    C = .4
+    D = .005
     cell = brc(A, C, B, D)
     
-    xy = torch.meshgrid(torch.linspace(-1,1, 100), torch.linspace(-1,2,100), indexing = 'ij')
+    xy = torch.meshgrid(torch.linspace(-1.5,1.5, 100), torch.linspace(-1,2,100), indexing = 'ij')
     xy = torch.cat((xy[0].unsqueeze(0), xy[1].unsqueeze(0)))
     def u_t(t):
         # return .5*(2*torch.pi*.1*t).sin()
