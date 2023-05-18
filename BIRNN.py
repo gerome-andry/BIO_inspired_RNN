@@ -176,6 +176,7 @@ class SenseMemAct(nn.Module):
         self.dec = decisions
         self.memsz = mem_sz
         self.orth = ortho
+        self.type = type
         if type == 'BRC':
             self.mem = nBRC(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
         elif type == 'BEF':
@@ -209,7 +210,7 @@ class SenseMemAct(nn.Module):
             out = self.decision(self.act(memory.reshape((-1, M))).reshape((B,L,self.dec)))
         
         else:
-            if type != 'GRU':
+            if self.type != 'GRU':
                 out = self.mem(inputs, mem = True)
             else:
                 out,_ = self.mem(inputs)
