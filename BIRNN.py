@@ -54,24 +54,40 @@ class nBRC(nn.Module): #extend to multiple layers ?
 
     def step(self, x, h, bist = False): #x of the form (B,N), h -> (B,M)
         a = 1 + torch.tanh(self.ff_ia(x) + self.ff_ha(h))
-        # if bist:
-        #     pass
-        #     print("Proportion of bistable neurons",(a.mean(0) > 1).sum()/(a.mean(0).numel()))
         c = torch.sigmoid(self.ff_ic(x) + self.ff_hc(h))
 
-        return c*h + (1-c)*torch.tanh(self.ff_io(x) + a*h)
+        hfn = c*h + (1-c)*torch.tanh(self.ff_io(x) + a*h)
+        if bist:
+            return a,c, hfn
+        
+        return hfn
     
-    def forward(self, u, h0 = None): #u -> (B,L,N), h0 initial mem (B,M)
+    def forward(self, u, h0 = None, mem = False): #u -> (B,L,N), h0 initial mem (B,M)
         B, L, _ = u.shape
         if h0 is None:
             h0 = torch.zeros((B, self.mem_sz)).to(u)
 
         h_t = [h0]
+        if mem:
+            al,cl = [],[]
         for i in range(L):
-            h_next = self.step(u[:,i], h_t[-1], bist = i % 30 == 0)
+            if mem:
+                a,c,h_next= self.step(u[:,i], h_t[-1], bist = True)
+                al.append(a)
+                cl.append(c)
+            else:
+                h_next = self.step(u[:,i], h_t[-1])
             h_t.append(h_next)
         
         h_t = [h.unsqueeze(1) for h in h_t[1:]]
+
+        if mem:
+            a_t = [at.unsqueeze(1) for at in al]
+            c_t = [ct.unsqueeze(1) for ct in cl]
+            
+            return torch.cat(a_t, dim = 1),\
+                   torch.cat(c_t, dim = 1),\
+                   torch.cat(h_t, dim = 1)
         
         return torch.cat(h_t, dim = 1), h_t[-1] # (B,L,M)
 
@@ -153,14 +169,21 @@ class nBEFRC(nn.Module): #extend to multiple layers ?
         return torch.cat(h_t, dim = 1), h_t[-1] # (B,L,M)
 
 class SenseMemAct(nn.Module):
-    def __init__(self, sensor_net, actor_net, mem_lay = 1, in_sz = 1, mem_sz = 64, decisions = 3, bias = False, ortho = False):
+    def __init__(self, sensor_net, actor_net, type = 'BRC', mem_lay = 1, in_sz = 1, mem_sz = 64, decisions = 3, bias = False, ortho = False):
         super().__init__()
         self.sense = sensor_net
         self.act = actor_net
         self.dec = decisions
         self.memsz = mem_sz
         self.orth = ortho
-        self.mem = nBEFRC(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
+        if type == 'BRC':
+            self.mem = nBRC(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
+        elif type == 'BEF':
+            self.mem = nBEFRC(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
+        elif type == 'GRU':
+            self.mem = nn.GRU(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
+        else:
+            raise NotImplementedError()
         # self.mem = nn.ModuleList([nn.GRU(in_sz, mem_sz, 1, bias = bias, batch_first = True) for _ in range(mem_lay)])
         self.decision = nn.Softmax(dim = -1)
         self.l = nn.CrossEntropyLoss()
@@ -186,7 +209,10 @@ class SenseMemAct(nn.Module):
             out = self.decision(self.act(memory.reshape((-1, M))).reshape((B,L,self.dec)))
         
         else:
-            out = self.mem(inputs, mem = True)
+            if type != 'GRU':
+                out = self.mem(inputs, mem = True)
+            else:
+                out,_ = self.mem(inputs)
 
         return out
 
@@ -202,9 +228,5 @@ class SenseMemAct(nn.Module):
 
         return  (10/30)*self.l(pred_dec, targ_dec) + (20/30)*self.l(pred_ndec, targ_ndec)
         # return self.l(pred, target.transpose(-2,-1))
-# probs = torch.rand((1,10,3))
-# print(probs)
-# ch = encode_choice(probs)
-# print(ch)
-# print(decode_choice(ch))
+
 

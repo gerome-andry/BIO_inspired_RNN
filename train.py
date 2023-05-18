@@ -15,11 +15,13 @@ in_emb = memory_size//4
 mem_lay = 1
 inputs_dim = 2
 decisions = 3
+CELL = 'GRU'
 
 sensor = ResMLP(inputs_dim, in_emb, [64,64,64])
 actor = ResMLP(memory_size, decisions, [64,64,64])
 
-model = SenseMemAct(sensor, actor, in_sz=in_emb, mem_sz=memory_size, mem_lay=mem_lay, decisions=decisions).cuda()
+model = SenseMemAct(sensor, actor, in_sz=in_emb, mem_sz=memory_size, 
+                    mem_lay=mem_lay, decisions=decisions, type = CELL).cuda()
 
 sg = StimGenerator(dt = .1)
 optimizer = torch.optim.AdamW(
@@ -68,9 +70,6 @@ for ep in trange(epoch):
 
             pred = model(mod_in.cuda()).cpu()
 
-            for i in range(3):
-                plt.plot(pred[0,:,i], label = f'p({choice_d[i]})')
-
             pred = encode_choice(pred)
             plt.plot(inp[0,:])
             plt.title('pred')
@@ -83,4 +82,4 @@ for ep in trange(epoch):
 plt.plot(loss)
 plt.show()
 
-torch.save(model.state_dict(), './checkpoint_BEF.pth')
+torch.save(model.state_dict(), './checkpoint_GRU.pth')
