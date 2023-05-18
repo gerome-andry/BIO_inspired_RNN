@@ -12,7 +12,7 @@ batch = 64
 batch_sz = 128
 memory_size = 128
 in_emb = memory_size//4
-mem_lay = 1
+mem_lay = 5
 inputs_dim = 2
 decisions = 3
 CELL = 'GRU'
@@ -32,8 +32,8 @@ optimizer = torch.optim.AdamW(
 
 choice_d = {
     0 : 'none',
-    1 : 'same',
-    2 : 'diff'
+    1 : 'up',
+    2 : 'down'
 }
 
 loss = []
@@ -70,11 +70,15 @@ for ep in trange(epoch):
 
             pred = model(mod_in.cuda()).cpu()
 
+            for i in range(3):
+                plt.plot(pred[0,:,i], label = f'p({choice_d[i]})')
+
             pred = encode_choice(pred)
             plt.plot(inp[0,:])
             plt.title('pred')
             plt.plot(out[0,:])
             plt.plot(pred[0,:])
+            plt.legend()
             plt.show(block = False)
             plt.pause(.01)
             plt.clf()
@@ -82,4 +86,4 @@ for ep in trange(epoch):
 plt.plot(loss)
 plt.show()
 
-torch.save(model.state_dict(), './checkpoint_GRU.pth')
+torch.save(model.state_dict(), './checkpoint_GRUdeep.pth')
