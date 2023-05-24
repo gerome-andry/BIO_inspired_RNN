@@ -43,20 +43,22 @@ class ResMLP(nn.Module):
 class nBRC(nn.Module): #extend to multiple layers ?
     def __init__(self, in_sz, mem_sz, mem_lay = 1, bias = False, batch_first = True):
         super().__init__()
-        self.ff_ia = nn.Linear(in_sz, mem_sz, bias = bias)
-        self.ff_ha = nn.Linear(mem_sz, mem_sz, bias = bias)
 
-        self.ff_ic = nn.Linear(in_sz, mem_sz, bias = bias)
-        self.ff_hc = nn.Linear(mem_sz, mem_sz, bias = bias)
+        self.ff_im = nn.Linear(in_sz, 3*mem_sz, bias = bias)
+        self.ff_mm = nn.Linear(mem_sz, 2*mem_sz, bias = bias)
 
-        self.ff_io = nn.Linear(in_sz, mem_sz, bias = bias)
         self.mem_sz = mem_sz
 
     def step(self, x, h, bist = False): #x of the form (B,N), h -> (B,M)
-        a = 1 + torch.tanh(self.ff_ia(x) + self.ff_ha(h))
-        c = torch.sigmoid(self.ff_ic(x) + self.ff_hc(h))
+        in_emb = self.ff_im(x)
+        i_a, i_c, i_o = in_emb.split(self.mem_sz, 1)
+        mem_emb = self.ff_mm(h)
+        m_a, m_c = mem_emb.split(self.mem_sz, 1)
 
-        hfn = c*h + (1-c)*torch.tanh(self.ff_io(x) + a*h)
+        a = 1 + torch.tanh(i_a + m_a)
+        c = torch.sigmoid(i_c + m_c)
+
+        hfn = c*h + (1-c)*torch.tanh(i_o + a*h)
         if bist:
             return a,c, hfn
         
@@ -94,33 +96,25 @@ class nBRC(nn.Module): #extend to multiple layers ?
 class nBEFRC(nn.Module): #extend to multiple layers ?
     def __init__(self, in_sz, mem_sz, mem_lay = 1, bias = False, batch_first = True, dt = .1):
         super().__init__()
-        self.ff_ia = nn.Linear(in_sz, mem_sz, bias = bias)
-        self.ff_ha = nn.Linear(mem_sz, mem_sz, bias = bias)
+        self.ff_im = nn.Linear(in_sz, 6*mem_sz)
+        self.ff_mm = nn.Linear(mem_sz, 5*mem_sz)
 
-        self.ff_ib = nn.Linear(in_sz, mem_sz, bias = bias)
-        self.ff_hb = nn.Linear(mem_sz, mem_sz, bias = bias)
-
-        self.ff_ic = nn.Linear(in_sz, mem_sz, bias = bias)
-        self.ff_hc = nn.Linear(mem_sz, mem_sz, bias = bias)
-
-        self.ff_id = nn.Linear(in_sz, mem_sz, bias = bias)
-        self.ff_hd = nn.Linear(mem_sz, mem_sz, bias = bias)
-
-        self.ff_ie = nn.Linear(in_sz, mem_sz, bias = bias)
-        self.ff_he = nn.Linear(mem_sz, mem_sz, bias = bias)
-
-        self.ff_io = nn.Linear(in_sz, mem_sz, bias = bias)
         self.mem_sz = mem_sz
         self.dt = dt
 
     def step(self, x, hf, hs, bist = False): #x of the form (B,N), h -> (B,M)
-        a = 1 + torch.tanh(self.ff_ia(x) + self.ff_ha(hf)) #a in [0, 2]
-        b = (3/2)*(1 + torch.tanh(self.ff_ib(x) + self.ff_hb(hf))) #b in [0, 3]
-        c = 3*self.dt + (1-3*self.dt)*torch.sigmoid(self.ff_ic(x) + self.ff_hc(hf)) #fast 1/tau in [3, 10]
-        d = .3*self.dt*torch.sigmoid(self.ff_id(x) + self.ff_hd(hf)) #slow epsilon in [0, .3] (one order below the fast)
-        e = 1 + torch.sigmoid(self.ff_ie(x) + self.ff_he(hf)) #e in [1,2]
+        in_emb = self.ff_im(x)
+        i_a, i_b, i_c, i_d, i_e, i_o = in_emb.split(self.mem_sz, 1)
+        mem_emb = self.ff_mm(hf)
+        m_a, m_b, m_c, m_d, m_e = mem_emb.split(self.mem_sz, 1)
 
-        hfn = (1-c)*hf + c*torch.tanh(self.ff_io(x) + (a + b*hf**2 - hs)*hf)
+        a = 1 + torch.tanh(i_a + m_a)
+        b = (3/2)*(1 + torch.tanh(i_b + m_b)) #b in [0, 3]
+        c = 3*self.dt + (1-3*self.dt)*torch.sigmoid(i_c + m_c) #fast 1/tau in [3, 10]
+        d = .3*self.dt*torch.sigmoid(i_d + m_d) #slow epsilon in [0, .3] (one order below the fast)
+        e = 1 + torch.sigmoid(i_e + m_e) #e in [1,2]
+
+        hfn = (1-c)*hf + c*torch.tanh(i_o + (a + b*hf**2 - hs)*hf)
         hsn = hs*(1-d) + d*(e*hf)**4
         if bist:
             return a,b,c,d,e, hfn, hsn
