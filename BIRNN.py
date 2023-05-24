@@ -145,7 +145,7 @@ class nBEFRC(nn.Module): #extend to multiple layers ?
             hs_t.append(hs_next)
         
         h_t = [h.unsqueeze(1) for h in hf_t[1:]]
-        
+        h_s = [h.unsqueeze(1) for h in hs_t[1:]]
         if mem:
             a_t = [at.unsqueeze(1) for at in al]
             b_t = [bt.unsqueeze(1) for bt in bl]
@@ -158,7 +158,8 @@ class nBEFRC(nn.Module): #extend to multiple layers ?
                    torch.cat(c_t, dim = 1),\
                    torch.cat(d_t, dim = 1),\
                    torch.cat(e_t, dim = 1),\
-                   torch.cat(h_t, dim = 1) 
+                   torch.cat(h_t, dim = 1),\
+                   torch.cat(h_s, dim = 1),
         
         return torch.cat(h_t, dim = 1), h_t[-1] # (B,L,M)
 
@@ -185,14 +186,14 @@ class SenseMemAct(nn.Module):
 
     def forward(self, x, debug_mem = False): 
         # print(x, debug_mem)
-        # X of the size (Batch, Sequence_lg, Input_sz)
+        # X of the size (Batch, Sequence_lg, Input_sz) 
         # Denoted B,L,N
         with torch.no_grad():
             # orthogonal matrix hidden-hidden
             if self.orth:
                 u,_,v = torch.linalg.svd(self.mem[0].weight_hh_l0[:self.memsz,:])
                 self.mem[0].weight_hh_l0[:self.memsz,:] = u@v
-
+        
         B, L, N = x.shape        
         # transfer sequence to sensor -> go back to sequence
         inputs = self.sense(x.reshape((-1, N))).reshape((B,L,-1))
@@ -206,6 +207,7 @@ class SenseMemAct(nn.Module):
         else:
             if self.type != 'GRU':
                 out = self.mem(inputs, mem = True)
+
             else:
                 out,_ = self.mem(inputs)
 
