@@ -9,14 +9,14 @@ import time
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 epoch = 128
-batch = 128
-batch_sz = 64
+batch = 64
+batch_sz = 128
 memory_size = 128
 in_emb = memory_size//4
 mem_lay = 1
 inputs_dim = 2
 decisions = 3
-CELL = 'GRU'
+CELL = 'BRC'
 
 sensor = ResMLP(inputs_dim, in_emb, [64,64,64])
 actor = ResMLP(memory_size, decisions, [64,64,64])
