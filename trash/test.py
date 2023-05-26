@@ -24,10 +24,10 @@ if __name__ == '__main__':
     tau = .001
     eps = .1
     dt = .1#.001
-    A = 1.7
-    B = 2.5
+    A = .8
+    B = 0
     C = .4
-    D = .005
+    D = 0
     cell = brc(A, C, B, D)
     
     xy = torch.meshgrid(torch.linspace(-1.5,1.5, 100), torch.linspace(-1,2,100), indexing = 'ij')
