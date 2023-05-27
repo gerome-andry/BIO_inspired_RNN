@@ -19,7 +19,7 @@ class StimGenerator():
         self.dt = dt
         self.f = freq
 
-    def get_batch_data(self, nb = 256):
+    def get_batch_data(self, nb = 256, random = True, stim_type = True):
         times = torch.linspace(0, self.max_t, int(self.max_t//self.dt))
         t_idx = torch.arange(len(times))
 
@@ -43,6 +43,13 @@ class StimGenerator():
         
         # determine if signal will be of type fast or slow -> True = fast, False = slow
         types = torch.randint(2, (nb, 2), dtype = torch.bool)
+        if random == False :
+            if stim_type == False:
+                ## high pulse
+                types = torch.zeros((nb, 2), dtype = torch.bool)
+            else:
+                ## low pulse
+                types = torch.ones((nb, 2), dtype = torch.bool)
         # compute the expected decision -> True = same, False = different
         # decision = types[:,0] == types[:,1]
         decision = types[:,0] == 0
