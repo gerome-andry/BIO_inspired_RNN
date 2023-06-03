@@ -184,7 +184,7 @@ class SenseMemAct(nn.Module):
         self.decision = nn.Softmax(dim = -1)
         self.l = nn.CrossEntropyLoss()
 
-    def forward(self, x, debug_mem = False): 
+    def forward(self, x, debug_mem = False, mem = False): 
         # print(x, debug_mem)
         # X of the size (Batch, Sequence_lg, Input_sz) 
         # Denoted B,L,N
@@ -203,6 +203,8 @@ class SenseMemAct(nn.Module):
             B, L, M = memory.shape
             # transfer sequence output to actions sequence 
             out = self.decision(self.act(memory.reshape((-1, M))).reshape((B,L,self.dec)))
+            if mem:
+                out = (out, memory)
         
         else:
             if self.type != 'GRU':
@@ -216,14 +218,21 @@ class SenseMemAct(nn.Module):
     def loss(self, x, target):
         # X - (B,L,N) | T - (B,L,O), O = 3 (choices)
 
-        pred = self(x)
-        
+        pred, mem = self(x, mem = True)
+
         mask = (target[:,:,0] != 1)
         not_m = torch.bitwise_not(mask)
         pred_dec, targ_dec = pred[mask], target[mask]
         pred_ndec, targ_ndec = pred[not_m], target[not_m]
 
-        return  (10/30)*self.l(pred_dec, targ_dec) + (20/30)*self.l(pred_ndec, targ_ndec)
+        #compute correlation
+        corr = []
+        for m in mem:
+            corr.append(-torch.corrcoef(m.T)[0].square().sum())
+
+        corr = torch.tensor(corr).mean()
+
+        return  self.l(pred_dec, targ_dec) + self.l(pred_ndec, targ_ndec) + corr/self.memsz
         # return self.l(pred, target.transpose(-2,-1))
 
 

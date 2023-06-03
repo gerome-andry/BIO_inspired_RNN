@@ -16,13 +16,17 @@ in_emb = memory_size//4
 mem_lay = 1
 inputs_dim = 2
 decisions = 3
-CELL = 'BRC'
+CELL = 'BEF'
 
 sensor = ResMLP(inputs_dim, in_emb, [64,64,64])
 actor = ResMLP(memory_size, decisions, [64,64,64])
 
 model = SenseMemAct(sensor, actor, in_sz=in_emb, mem_sz=memory_size, 
                     mem_lay=mem_lay, decisions=decisions, type = CELL).cuda()
+
+modelfname = f'./results_train/checkpoint_{CELL}.pth'
+state = torch.load(modelfname, map_location=torch.device('cuda'))
+model.load_state_dict(state)
 
 sg = StimGenerator(dt = .1)
 optimizer = torch.optim.AdamW(
@@ -56,11 +60,11 @@ for ep in trange(epoch):
         with torch.autograd.set_detect_anomaly(True):
             l.backward()
             optimizer.step()
-        # print(l)
+        print(l)
         loss.append((l.detach()).cpu())
         if loss[-1] < best:
             best = loss[-1]
-            torch.save(model.state_dict(), f'./results_train/checkpoint_{CELL}.pth')
+            torch.save(model.state_dict(), f'./results_train/checkpoint_{CELL}_corr.pth')
 
         # with torch.no_grad():
         #     inp, out = sg.get_batch_data(2)
@@ -90,4 +94,4 @@ for ep in trange(epoch):
 
 plt.plot(loss)
 plt.show()
-torch.save(loss, f'./results_train/loss_{CELL}.pt')
+torch.save(loss, f'./results_train/loss_{CELL}_corr.pt')
