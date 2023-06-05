@@ -39,7 +39,8 @@ class ResMLP(nn.Module):
             x = x + self.activ(l(x))
 
         return self.tail(x)
-    
+
+
 class nBRC(nn.Module): #extend to multiple layers ?
     def __init__(self, in_sz, mem_sz, mem_lay = 1, bias = False, batch_first = True):
         super().__init__()
@@ -162,6 +163,88 @@ class nBEFRC(nn.Module): #extend to multiple layers ?
                    torch.cat(h_s, dim = 1),
         
         return torch.cat(h_t, dim = 1), h_t[-1] # (B,L,M)
+    
+class _surrogate_relu(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, h):
+        ctx.save_for_backward(h)
+        return nn.functional.relu(h)
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        h, = ctx.saved_tensors
+        return grad_output, None
+    
+class mSRC(nn.Module):
+    def __init__(self, in_sz, mem_sz, mem_lay = 1, bias = False, batch_first = True, dt = .1):
+        super().__init__()
+        self.ff_im = nn.Linear(in_sz, mem_sz*2)
+        self.ff_mm = nn.Linear(mem_sz, mem_sz)
+
+        self.mem_sz = mem_sz
+        self.dt = dt
+        self.soma_fast = 4
+        self.soma_slow = 7
+        self.modulation_bias = 0.4
+        #self.soma_bias = 1
+        self.soma_eps_base = 0.9
+        self.bias_mod_range = 5
+        self.activation = _surrogate_relu.apply
+    def variable_eps(self,fast_potentials):
+        return self.soma_eps_base + self.soma_eps_base / \
+                (1 + torch.exp((fast_potentials - .5) / -.1))
+
+    def step(self, x, hf, hs, bist = False): #x of the form (B,N), h -> (B,M)
+        in_emb = self.ff_im(x)
+        soma_bias_contribution_1, i_o = in_emb.split(self.mem_sz, 1)
+
+
+        soma_bias = torch.tanh(soma_bias_contribution_1 /self.bias_mod_range)*self.bias_mod_range
+        hfn = torch.tanh(
+                i_o
+                + self.soma_fast * hf
+                - self.soma_slow * torch.square(hs + self.modulation_bias)
+                + soma_bias)
+        #hfn = self.activation(hfn)
+
+        slow_eps = self.variable_eps(hf)
+
+        hsn = (1-slow_eps)*hs + slow_eps*hf
+
+        if bist:
+            return soma_bias, hfn, hsn
+        
+        return hfn, hsn
+                
+    
+    def forward(self, u, h0 = None, mem = False): #u -> (B,L,N), h0 initial mem (B,M)
+        B, L, _ = u.shape
+        if h0 is None:
+            h0 = torch.zeros((2, B, self.mem_sz)).to(u)
+
+        hf_t = [h0[0]]
+        hs_t = [h0[1]]
+        if mem:
+            current_bias = []
+        for i in range(L):
+            if mem:
+                b1,hf_next, hs_next = self.step(u[:,i], hf_t[-1], hs_t[-1], bist = True)
+                current_bias.append(b1)
+            else:
+                hf_next, hs_next = self.step(u[:,i], hf_t[-1], hs_t[-1])
+            hf_t.append(hf_next)
+            hs_t.append(hs_next)
+        
+        h_t = [h.unsqueeze(1) for h in hf_t[1:]]
+        h_s = [h.unsqueeze(1) for h in hs_t[1:]]
+        if mem:
+            b1_t = [at.unsqueeze(1) for at in current_bias]
+
+            return torch.cat(b1_t, dim = 1),\
+                   torch.cat(h_t, dim = 1),\
+                   torch.cat(h_s, dim = 1),
+        
+        return torch.cat(h_t, dim = 1), h_t[-1] # (B,L,M)
 
 class SenseMemAct(nn.Module):
     def __init__(self, sensor_net, actor_net, type = 'BRC', mem_lay = 1, in_sz = 1, mem_sz = 64, decisions = 3, bias = False, ortho = False):
@@ -178,6 +261,8 @@ class SenseMemAct(nn.Module):
             self.mem = nBEFRC(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
         elif type == 'GRU':
             self.mem = nn.GRU(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
+        elif type == 'mSRC':
+            self.mem = mSRC(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
         else:
             raise NotImplementedError()
         # self.mem = nn.ModuleList([nn.GRU(in_sz, mem_sz, 1, bias = bias, batch_first = True) for _ in range(mem_lay)])
@@ -232,7 +317,7 @@ class SenseMemAct(nn.Module):
 
         corr = torch.tensor(corr).mean()
 
-        return  self.l(pred_dec, targ_dec) + self.l(pred_ndec, targ_ndec) + corr/self.memsz
+        return  self.l(pred_dec, targ_dec) + self.l(pred_ndec, targ_ndec)# + corr/self.memsz
         # return self.l(pred, target.transpose(-2,-1))
 
 
