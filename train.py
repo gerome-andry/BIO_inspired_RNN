@@ -45,7 +45,7 @@ loss = []
 best = 100
 for ep in trange(epoch):
     for ib in range(batch):
-        inp, out = sg.get_batch_data(batch_sz)
+        inp, out = sg.get_batch_data(batch_sz, hard = True)
         inp, out = sg.extend_sim(30, inp, out)
 
         optimizer.zero_grad()
@@ -64,7 +64,7 @@ for ep in trange(epoch):
         loss.append((l.detach()).cpu())
         if loss[-1] < best:
             best = loss[-1]
-            torch.save(model.state_dict(), f'./results_train/checkpoint_{CELL}_corr.pth')
+            torch.save(model.state_dict(), f'./results_train/checkpoint_{CELL}_hard.pth')
 
         # with torch.no_grad():
         #     inp, out = sg.get_batch_data(2)
@@ -94,4 +94,4 @@ for ep in trange(epoch):
 
 plt.plot(loss)
 plt.show()
-torch.save(loss, f'./results_train/loss_{CELL}_corr.pt')
+torch.save(loss, f'./results_train/loss_{CELL}_harder.pt')
