@@ -310,14 +310,7 @@ class SenseMemAct(nn.Module):
         pred_dec, targ_dec = pred[mask], target[mask]
         pred_ndec, targ_ndec = pred[not_m], target[not_m]
 
-        #compute correlation
-        corr = []
-        for m in mem:
-            corr.append(-torch.corrcoef(m.T)[0].square().sum())
-
-        corr = torch.tensor(corr).mean()
-
-        return  self.l(pred_dec, targ_dec) + self.l(pred_ndec, targ_ndec)# + corr/self.memsz
+        return  self.l(pred_dec, targ_dec) + self.l(pred_ndec, targ_ndec)
         # return self.l(pred, target.transpose(-2,-1))
 
 
