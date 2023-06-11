@@ -16,7 +16,7 @@ in_emb = memory_size//4
 mem_lay = 1
 inputs_dim = 2
 decisions = 3
-CELL = 'BEF'
+CELL = 'GRU'
 
 sensor = ResMLP(inputs_dim, in_emb, [64,64,64])
 actor = ResMLP(memory_size, decisions, [64,64,64])
