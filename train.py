@@ -24,9 +24,9 @@ actor = ResMLP(memory_size, decisions, [64,64,64])
 model = SenseMemAct(sensor, actor, in_sz=in_emb, mem_sz=memory_size, 
                     mem_lay=mem_lay, decisions=decisions, type = CELL).cuda()
 
-# modelfname = f'./results_train/checkpoint_{CELL}.pth'
-# state = torch.load(modelfname, map_location=torch.device('cuda'))
-# model.load_state_dict(state)
+modelfname = f'./results_train/checkpoint_{CELL}.pth'
+state = torch.load(modelfname, map_location=torch.device('cuda'))
+model.load_state_dict(state)
 
 sg = StimGenerator(dt = .1)
 optimizer = torch.optim.AdamW(
@@ -45,7 +45,7 @@ loss = []
 best = 100
 for ep in trange(epoch):
     for ib in range(batch):
-        inp, out = sg.get_batch_data(batch_sz, hard = True)
+        inp, out = sg.get_batch_data(batch_sz)
         inp, out = sg.extend_sim(30, inp, out)
 
         optimizer.zero_grad()
@@ -64,7 +64,7 @@ for ep in trange(epoch):
         loss.append((l.detach()).cpu())
         if loss[-1] < best:
             best = loss[-1]
-            torch.save(model.state_dict(), f'./results_train/checkpoint_{CELL}_hard_scratch.pth')
+            torch.save(model.state_dict(), f'./results_train/checkpoint_{CELL}_corr.pth')
 
         # with torch.no_grad():
         #     inp, out = sg.get_batch_data(2)
@@ -94,4 +94,4 @@ for ep in trange(epoch):
 
 plt.plot(loss)
 plt.show()
-torch.save(loss, f'./results_train/loss_{CELL}_harder_scratch.pt')
+torch.save(loss, f'./results_train/loss_{CELL}_corr.pt')
