@@ -19,7 +19,7 @@ class StimGenerator():
         self.dt = dt
         self.f = freq
 
-    def get_batch_data(self, nb = 256, random = True, stim_type = True):
+    def get_batch_data(self, nb = 256, random = True, stim_type = True, hard = False):
         times = torch.linspace(0, self.max_t, int(self.max_t//self.dt))
         t_idx = torch.arange(len(times))
 
@@ -29,8 +29,10 @@ class StimGenerator():
         first_stim_ok = self.dt_inout + self.cooldown
         first_stim_stop = .5*(self.max_t - self.cooldown) - self.dt_stim
         scnd_stim_stop = self.max_t - self.cooldown - self.dt_stim - self.dt_inout
-        # t1_mask = torch.bitwise_and(times > first_stim_ok, times < first_stim_stop)
-        t1_mask = torch.bitwise_and(times > first_stim_ok, times < scnd_stim_stop)
+        if hard:
+            t1_mask = torch.bitwise_and(times > first_stim_ok, times < first_stim_stop)
+        else:
+            t1_mask = torch.bitwise_and(times > first_stim_ok, times < scnd_stim_stop)
         t1 = torch.tensor(np.random.choice(t_idx[t1_mask], size = nb, replace = True))
 
         # get time of second signal
@@ -51,8 +53,10 @@ class StimGenerator():
                 ## low pulse
                 types = torch.ones((nb, 2), dtype = torch.bool)
         # compute the expected decision -> True = same, False = different
-        # decision = types[:,0] == types[:,1]
-        decision = types[:,0] == 0
+        if hard:
+            decision = types[:,0] == types[:,1]
+        else:
+            decision = types[:,0] == 0
         
         # create input (START - S1 - S2 - STOP)
         input_s = torch.zeros((nb, len(times)))
@@ -65,8 +69,9 @@ class StimGenerator():
         s_s_b = self.s_stim()
         input_s.scatter_(1, s1_t, f_s_b*(types[:,:1].expand(-1,len(f_s_b))) +
                           s_s_b*(torch.bitwise_not(types[:,:1]).expand(-1,len(f_s_b))))
-        # input_s.scatter_(1, s2_t, f_s_b*(types[:,1:].expand(-1,len(f_s_b))) +
-        #                   s_s_b*(torch.bitwise_not(types[:,1:]).expand(-1,len(f_s_b))))
+        if hard:
+            input_s.scatter_(1, s2_t, f_s_b*(types[:,1:].expand(-1,len(f_s_b))) +
+                          s_s_b*(torch.bitwise_not(types[:,1:]).expand(-1,len(f_s_b))))
         
         input_s[:,:t_start_sign] = 1
         input_s[:,t_stop_sign:] = 1
@@ -129,7 +134,7 @@ class StimGenerator():
 if __name__ == '__main__':
     sg = StimGenerator(dt = .01, rest = 0)
     B = 10
-    i,o = sg.get_batch_data(B)
+    i,o = sg.get_batch_data(B, hard = True)
     i,o = sg.extend_sim(30, i, o)
     # print(i.shape)
 
