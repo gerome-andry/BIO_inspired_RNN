@@ -16,7 +16,7 @@ in_emb = memory_size//4
 mem_lay = 1
 inputs_dim = 2
 decisions = 3
-CELL = 'GRU'
+CELL = 'LSTM'
 
 sensor = ResMLP(inputs_dim, in_emb, [64,64,64])
 actor = ResMLP(memory_size, decisions, [64,64,64])
@@ -45,7 +45,7 @@ loss = []
 best = 100
 for ep in trange(epoch):
     for ib in range(batch):
-        inp, out = sg.get_batch_data(batch_sz, hard = True)
+        inp, out = sg.get_batch_data(batch_sz, hard = False)
         inp, out = sg.extend_sim(30, inp, out)
 
         optimizer.zero_grad()

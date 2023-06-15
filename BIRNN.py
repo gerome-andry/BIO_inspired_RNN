@@ -263,6 +263,8 @@ class SenseMemAct(nn.Module):
             self.mem = nn.GRU(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
         elif type == 'mSRC':
             self.mem = mSRC(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
+        elif type == 'LSTM':
+            self.mem = nn.LSTM(in_sz, mem_sz, mem_lay, bias = bias, batch_first = True)
         else:
             raise NotImplementedError()
         # self.mem = nn.ModuleList([nn.GRU(in_sz, mem_sz, 1, bias = bias, batch_first = True) for _ in range(mem_lay)])
@@ -292,7 +294,7 @@ class SenseMemAct(nn.Module):
                 out = (out, memory)
         
         else:
-            if self.type != 'GRU':
+            if self.type != 'GRU' and self.type != 'LSTM':
                 out = self.mem(inputs, mem = True)
 
             else:
